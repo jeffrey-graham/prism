@@ -8,8 +8,9 @@ An optional indexer that polls Soroban RPC and persists contract deployments, in
 cd indexer
 npm install
 
-# Set the database connection string
+# Set the required database connection string and Soroban RPC endpoint
 export DATABASE_URL="postgresql://user:password@localhost:5432/prism"
+export SOROBAN_RPC_URL="https://soroban-testnet.stellar.org"
 
 # Generate the Prisma client and run migrations
 npm run prisma:generate
@@ -38,7 +39,7 @@ docker compose up
 | Environment Variable | Default                              | Description                          |
 | -------------------- | ------------------------------------ | ------------------------------------ |
 | `DATABASE_URL`       | *(required)*                         | PostgreSQL connection string         |
-| `SOROBAN_RPC_URL`    | `https://soroban-testnet.stellar.org` | Soroban RPC endpoint to poll        |
+| `SOROBAN_RPC_URL`    | *(required)*                         | Soroban RPC endpoint to poll        |
 | `POLL_INTERVAL_MS`   | `5000`                               | Milliseconds between poll cycles     |
 | `HEALTH_PORT`        | `8080`                               | Port for the `GET /healthz` endpoint |
 | `HEALTH_MAX_LEDGER_LAG` | `60`                              | Ledgers behind the network before `/healthz` returns 503 |

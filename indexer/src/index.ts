@@ -14,8 +14,13 @@ import {
 // ---------------------------------------------------------------------------
 // Environment variable validation (#20)
 // ---------------------------------------------------------------------------
-function requireEnv(name: string, fallback?: string): string {
-  const val = process.env[name] ?? fallback;
+export function requireEnv(
+  name: string,
+  fallback?: string,
+  env: NodeJS.ProcessEnv = process.env
+): string {
+  const raw = env[name]?.trim();
+  const val = raw ? raw : fallback;
   if (val === undefined) {
     console.error(`[indexer] fatal: environment variable ${name} is required but not set`);
     process.exit(1);
@@ -36,7 +41,7 @@ function requirePositiveInt(name: string, fallback: number): number {
   return n;
 }
 
-const RPC_URL = requireEnv("SOROBAN_RPC_URL", "https://soroban-testnet.stellar.org");
+const RPC_URL = requireEnv("SOROBAN_RPC_URL");
 const POLL_INTERVAL_MS = requirePositiveInt("POLL_INTERVAL_MS", 5000);
 const HEALTH_PORT = requirePositiveInt("HEALTH_PORT", 8080);
 const MAX_LEDGER_LAG = requirePositiveInt("HEALTH_MAX_LEDGER_LAG", 60);

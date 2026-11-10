@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { backoffDelay, commitPage, healthReport, seedLastLedger } from "./index.js";
+import { describe, expect, it, vi } from "vitest";
+
+vi.hoisted(() => {
+  process.env.SOROBAN_RPC_URL ??= "https://soroban-testnet.stellar.org";
+});
+
+import { backoffDelay, commitPage, healthReport, requireEnv, seedLastLedger } from "./index.js";
 
 describe("backoffDelay", () => {
   it("doubles the delay for each consecutive failure", () => {
@@ -125,5 +130,35 @@ describe("commitPage", () => {
     ).rejects.toThrow("injected failure");
     expect(committed.gaps).toEqual([]);
     expect(committed.cursor).toEqual({ lastLedger: 100, paginationCursor: null });
+  });
+});
+
+
+describe("requireEnv", () => {
+  it("returns the configured environment variable when set", () => {
+    expect(
+      requireEnv("SOROBAN_RPC_URL", undefined, {
+        SOROBAN_RPC_URL: "https://soroban-testnet.stellar.org",
+      })
+    ).toBe("https://soroban-testnet.stellar.org");
+  });
+
+  it("logs the fatal error and exits with code 1 when SOROBAN_RPC_URL is unset or blank", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
+
+    try {
+      for (const env of [{}, { SOROBAN_RPC_URL: "   " }]) {
+        expect(() => requireEnv("SOROBAN_RPC_URL", undefined, env)).toThrow("process.exit(1)");
+        expect(errorSpy).toHaveBeenCalledWith(
+          "[indexer] fatal: environment variable SOROBAN_RPC_URL is required but not set"
+        );
+      }
+    } finally {
+      errorSpy.mockRestore();
+      exitSpy.mockRestore();
+    }
   });
 });
