@@ -56,6 +56,11 @@ function getPool(): Pool {
   return pool;
 }
 
+/** Verify the configured Postgres pool can answer a trivial query. */
+export async function checkDatabaseHealth(): Promise<void> {
+  await getPool().query("SELECT 1");
+}
+
 export interface IndexedInvocation {
   txHash: string;
   ledger: number;
