@@ -23,7 +23,32 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npm run lint
-      - run: npm test
+      - run: npm run test:coverage
+      - name: Publish frontend coverage summary
+        if: always() && hashFiles('frontend/coverage/coverage-summary.json') != ''
+        run: |
+          node -e '
+            const fs = require("fs");
+            const t = JSON.parse(fs.readFileSync("coverage/coverage-summary.json", "utf8")).total;
+            const md = [
+              "### Frontend Coverage Summary",
+              "| Metric | Covered | Total | Pct |",
+              "| :--- | ---: | ---: | ---: |",
+              `| Statements | ${t.statements.covered} | ${t.statements.total} | ${t.statements.pct}% |`,
+              `| Branches | ${t.branches.covered} | ${t.branches.total} | ${t.branches.pct}% |`,
+              `| Functions | ${t.functions.covered} | ${t.functions.total} | ${t.functions.pct}% |`,
+              `| Lines | ${t.lines.covered} | ${t.lines.total} | ${t.lines.pct}% |`,
+              ""
+            ].join("\n");
+            console.log(md);
+            if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + "\n");
+          '
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          retention-days: 14
       - run: npm run build
         env:
           NEXT_PUBLIC_NETWORK: testnet
@@ -49,7 +74,32 @@ jobs:
       - run: npx prisma generate
       - run: npx tsc --noEmit
       - run: npm run lint
-      - run: npm test
+      - run: npm run test:coverage
+      - name: Publish indexer coverage summary
+        if: always() && hashFiles('indexer/coverage/coverage-summary.json') != ''
+        run: |
+          node -e '
+            const fs = require("fs");
+            const t = JSON.parse(fs.readFileSync("coverage/coverage-summary.json", "utf8")).total;
+            const md = [
+              "### Indexer Coverage Summary",
+              "| Metric | Covered | Total | Pct |",
+              "| :--- | ---: | ---: | ---: |",
+              `| Statements | ${t.statements.covered} | ${t.statements.total} | ${t.statements.pct}% |`,
+              `| Branches | ${t.branches.covered} | ${t.branches.total} | ${t.branches.pct}% |`,
+              `| Functions | ${t.functions.covered} | ${t.functions.total} | ${t.functions.pct}% |`,
+              `| Lines | ${t.lines.covered} | ${t.lines.total} | ${t.lines.pct}% |`,
+              ""
+            ].join("\n");
+            console.log(md);
+            if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + "\n");
+          '
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: indexer-coverage
+          path: indexer/coverage/
+          retention-days: 14
       - run: npm run build
 
   contracts:
