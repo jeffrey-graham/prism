@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { backoffDelay, commitPage, healthReport, seedLastLedger } from "./index.js";
+import {
+  backoffDelay,
+  commitPage,
+  healthReport,
+  metricLedgersProcessed,
+  metricPagesProcessed,
+  seedLastLedger,
+} from "./index.js";
 
 describe("backoffDelay", () => {
   it("doubles the delay for each consecutive failure", () => {
@@ -125,5 +132,37 @@ describe("commitPage", () => {
     ).rejects.toThrow("injected failure");
     expect(committed.gaps).toEqual([]);
     expect(committed.cursor).toEqual({ lastLedger: 100, paginationCursor: null });
+  });
+
+  it("records the number of ledgers advanced (40 when advancing from 100 to 140)", async () => {
+    metricLedgersProcessed.reset();
+    metricPagesProcessed.reset();
+    const { client } = fakeClient();
+
+    await commitPage([], { lastLedger: 140, paginationCursor: null }, client, 100);
+
+    const ledgersMetric = await metricLedgersProcessed.get();
+    const pagesMetric = await metricPagesProcessed.get();
+    expect(ledgersMetric.values[0]?.value ?? 0).toBe(40);
+    expect(pagesMetric.values[0]?.value ?? 0).toBe(0);
+  });
+
+  it("counts a ledger split across three pages once in ledgers_processed and three times in pages_processed", async () => {
+    metricLedgersProcessed.reset();
+    metricPagesProcessed.reset();
+
+    const nopClient = {
+      $transaction: async () => {},
+    } as unknown as Client;
+    const dummyTx = {} as never;
+
+    await commitPage([dummyTx], { lastLedger: 105, paginationCursor: "c1" }, nopClient, 104);
+    await commitPage([dummyTx], { lastLedger: 105, paginationCursor: "c2" }, nopClient, 105);
+    await commitPage([dummyTx], { lastLedger: 105, paginationCursor: null }, nopClient, 105);
+
+    const ledgersMetric = await metricLedgersProcessed.get();
+    const pagesMetric = await metricPagesProcessed.get();
+    expect(ledgersMetric.values[0]?.value ?? 0).toBe(1);
+    expect(pagesMetric.values[0]?.value ?? 0).toBe(3);
   });
 });

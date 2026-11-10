@@ -56,6 +56,27 @@ export const metricLedgersProcessed = new Counter({
   registers: [metricsRegistry],
 });
 
+export const metricPagesProcessed = new Counter({
+  name: "indexer_pages_processed_total",
+  help: "Total number of transaction pages processed by the indexer",
+  registers: [metricsRegistry],
+});
+
+export function recordPageMetrics(
+  previousCursor: number,
+  nextCursor: number,
+  transactionCount = 0
+): number {
+  const ledgersAdvanced = Math.max(0, nextCursor - previousCursor);
+  if (ledgersAdvanced > 0) {
+    metricLedgersProcessed.inc(ledgersAdvanced);
+  }
+  if (transactionCount > 0) {
+    metricPagesProcessed.inc();
+  }
+  return ledgersAdvanced;
+}
+
 export const metricRowsWritten = new Counter({
   name: "indexer_rows_written_total",
   help: "Total rows written, partitioned by table",
@@ -350,7 +371,8 @@ async function fetchPage(
 export async function commitPage(
   transactions: rpc.Api.TransactionInfo[],
   progress: PageProgress,
-  client: Pick<typeof prisma, "$transaction"> = prisma
+  client: Pick<typeof prisma, "$transaction"> = prisma,
+  previousCursor?: number
 ): Promise<void> {
   await client.$transaction(
     async (db) => {
@@ -364,6 +386,9 @@ export async function commitPage(
     },
     { timeout: 30_000 }
   );
+  if (previousCursor !== undefined) {
+    recordPageMetrics(previousCursor, progress.lastLedger, transactions.length);
+  }
 }
 
 async function main(): Promise<void> {
@@ -403,16 +428,13 @@ async function main(): Promise<void> {
           progress.lastLedger !== cursor ||
           progress.paginationCursor !== paginationCursor
         ) {
-          await commitPage(page.transactions, progress);
+          await commitPage(page.transactions, progress, prisma, cursor);
           cursor = progress.lastLedger;
           paginationCursor = progress.paginationCursor;
           health.cursor = cursor;
           console.log(`[indexer] processed through ledger ${cursor}`);
         }
         caughtUp = cursor >= latestNow.sequence && !paginationCursor;
-        if (page.transactions.length > 0) {
-          metricLedgersProcessed.inc();
-        }
       }
       consecutiveFailures = 0;
       health.lastPollFailed = false;
